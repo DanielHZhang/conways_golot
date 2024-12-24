@@ -1,0 +1,26 @@
+[package]
+name = "conways_golot"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+debug = 1
+debug-assertions = true
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = 3
+debug = 0
+panic = "abort"
+strip = "debuginfo"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+bevy = { version = "0.15", features = ["dynamic_linking"] }
+rand = "0.8.5"
