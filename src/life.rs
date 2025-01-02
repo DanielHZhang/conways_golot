@@ -1,14 +1,11 @@
 use bevy::prelude::*;
-use rand::prelude::*;
-
-use crate::Handles;
 
 #[derive(Resource, Debug)]
 pub struct Conway {
-	// pub entities: Vec<Entity>,
 	pub current: Vec<LifeCell>,
-	pub prev: Vec<LifeCell>,
+	pub allow_tick: bool,
 	size: usize,
+	generation: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -19,23 +16,19 @@ pub struct LifeCell {
 }
 
 impl Conway {
-	pub const CUBE_SIZE: f32 = 0.25;
-
 	pub fn new(size: usize) -> Self {
-		let capacity = size.saturating_mul(size);
-
 		Self {
-			// entities,
-			prev: Vec::with_capacity(capacity),
-			current: Vec::with_capacity(capacity),
+			current: Vec::with_capacity(size.saturating_mul(size)),
+			allow_tick: false,
 			size,
+			generation: 1,
 		}
 	}
 
 	pub fn tick(&mut self) {
 		const NEIGHBOURS: [(isize, isize); 8] = [(-1, 1), (-1, 0), (-1, -1), (0, 1), (0, -1), (1, 1), (1, 0), (1, -1)];
 
-		std::mem::swap(&mut self.prev, &mut self.current); // Use prev to build new current
+		let mut new_cells = Vec::with_capacity(self.size.saturating_mul(self.size));
 
 		for row in 0..self.size {
 			for col in 0..self.size {
@@ -49,20 +42,28 @@ impl Conway {
 						continue;
 					}
 
-					let cell = &self.prev[x as usize * self.size + y as usize];
+					let cell = &self.current[x as usize * self.size + y as usize];
 					if cell.alive {
 						alive_count += 1;
 					}
 				}
 
-				let cell = &mut self.current[row * self.size + col];
+				let mut cell = self.current[row * self.size + col].clone();
 				cell.alive = match (cell.alive, alive_count) {
 					(true, 2..=3) => true,
 					(false, 3) => true,
 					_ => false,
 				};
+				new_cells.push(cell);
 			}
 		}
+
+		self.current = new_cells;
+		self.generation += 1;
+	}
+
+	pub fn generation(&self) -> usize {
+		self.generation
 	}
 }
 
@@ -70,8 +71,5 @@ impl Conway {
 pub struct CellLocation {
 	pub row: usize,
 	pub col: usize,
-	pub tick: usize,
+	pub gen: usize,
 }
-
-#[derive(Component)]
-pub struct TopLayer;
