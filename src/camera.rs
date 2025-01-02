@@ -1,6 +1,9 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*};
+use bevy::{
+	input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
+	prelude::*,
+};
 
 #[derive(Debug, Resource)]
 pub struct CameraSettings {
@@ -22,11 +25,12 @@ impl Default for CameraSettings {
 }
 
 impl CameraSettings {
-	const ORBIT_DIST: f32 = 20.;
+	const ORBIT_DIST: f32 = 50.;
+	const TARGET: Vec3 = Vec3::new(0., -15., 0.);
 
 	pub fn init_transform() -> Transform {
-		let position = Vec3::new(1., 1., 1.).normalize() * 20.;
-		Transform::from_translation(position).looking_at(Vec3::ZERO, Vec3::Y)
+		let position = Vec3::new(1., 1., 1.).normalize() * Self::ORBIT_DIST;
+		Transform::from_translation(position).looking_at(Self::TARGET, Vec3::Y)
 	}
 }
 
@@ -49,7 +53,7 @@ pub fn orbit(
 	let (yaw, pitch, roll) = camera.rotation.to_euler(EulerRot::YXZ);
 	let pitch = (pitch + delta_pitch).clamp(-camera_settings.pitch_limit, camera_settings.pitch_limit);
 	let yaw = yaw + delta_yaw;
-	let target = Vec3::ZERO;
+	let target = CameraSettings::TARGET;
 
 	camera.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
 	camera.translation = target - camera.forward() * camera_settings.orbit_distance;

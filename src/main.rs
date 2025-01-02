@@ -5,8 +5,14 @@ use std::time::Duration;
 
 use bevy::{color::palettes, core_pipeline::tonemapping::DebandDither, prelude::*, time::common_conditions::on_timer};
 use camera::{orbit, CameraSettings};
-use life::{Conway, LifeCell, LifeCellRef};
+use life::{CellLocation, Conway, LifeCell, TopLayer};
 use rand::prelude::*;
+
+#[derive(Resource, Default)]
+struct Handles {
+	material: Handle<StandardMaterial>,
+	mesh: Handle<Mesh>,
+}
 
 fn main() {
 	let mut app = App::new();
@@ -21,27 +27,17 @@ fn main() {
 		..default()
 	}));
 
-	app.insert_resource(ClearColor(Color::BLACK));
+	app.insert_resource(ClearColor(Color::srgb_u8(21, 20, 28)));
 	app.init_resource::<CameraSettings>();
 	app.init_resource::<Handles>();
 
 	app.add_systems(Startup, setup);
-	app.add_systems(
-		Update,
-		(orbit, tick_simulation.run_if(on_timer(Duration::from_millis(200)))),
-	);
+	// app.add_systems(FixedUpdate, tick_simulation);
+	app.add_systems(PreUpdate, tick_simulation.run_if(on_timer(Duration::from_millis(1000))));
+	app.add_systems(Update, (orbit, translate_cells));
 
 	app.run();
 }
-
-#[derive(Resource, Default)]
-struct Handles {
-	material: Handle<StandardMaterial>,
-	mesh: Handle<Mesh>,
-}
-
-const CUBE_SIZE: f32 = 1.;
-const GRID_SIZE: usize = 20;
 
 fn setup(
 	mut commands: Commands,
@@ -78,88 +74,91 @@ fn setup(
 		..Default::default()
 	};
 	let material_handle = materials.add(alive_material);
-	let mesh_handle = meshes.add(Cuboid::from_length(CUBE_SIZE));
+	let cube = Cuboid::from_length(Conway::CUBE_SIZE);
+	let mesh_handle = meshes.add(cube);
 	handles.material = material_handle.clone();
 	handles.mesh = mesh_handle.clone();
 
 	// Conway board
-	let mut conway = Conway::new(GRID_SIZE as u8);
+	let size = 50;
+	let mut conway = Conway::new(size);
 	let mut rng = thread_rng();
-	for row in 0..GRID_SIZE {
-		for col in 0..GRID_SIZE {
+
+	for row in 0..size {
+		for col in 0..size {
 			let alive = if rng.gen_range(1..=6) > 3 { true } else { false };
-			let entity = commands
-				.spawn((
-					LifeCellRef { row, col, tick: 0 },
-					Mesh3d(mesh_handle.clone()),
-					MeshMaterial3d(material_handle.clone()),
-					Transform::from_xyz(row as f32 * CUBE_SIZE, 0., col as f32 * CUBE_SIZE),
-					if alive { Visibility::Visible } else { Visibility::Hidden },
-				))
-				.id();
-			conway.grid[row][col] = LifeCell {
-				entity: Some(entity),
-				alive,
-			};
+			if alive {
+				let entity = commands
+					.spawn((
+						// TopLayer,
+						CellLocation { row, col, tick: 0 },
+						Transform::from_xyz(row as f32 * Conway::CUBE_SIZE, 0., col as f32 * Conway::CUBE_SIZE),
+						Mesh3d(handles.mesh.clone()),
+						MeshMaterial3d(handles.material.clone()),
+					))
+					.id();
+				// conway.entities.push(entity);
+			}
+			conway.current.push(LifeCell { row, col, alive });
 		}
 	}
 
+	conway.prev = conway.current.clone();
 	commands.insert_resource(conway);
 }
 
 fn tick_simulation(
 	mut commands: Commands,
-	mut q_cells: Query<(&mut LifeCellRef, &mut Transform, &mut Visibility)>,
+	// mut q_cells: Query<(&mut CellLocation), With<TopLayer>>,
 	mut conway: ResMut<Conway>,
 	handles: Res<Handles>,
 ) {
-	// Before tick, clone the current state of the board
-	for (cell, _, visibility) in q_cells.iter_many(
-		conway
-			.grid
-			.iter()
-			.flat_map(|cells| cells)
-			.filter_map(|cell| cell.entity),
-	) {
-		if let Visibility::Hidden = visibility {
-			continue; // Skip hidden cells
-		}
-
-		let LifeCellRef { row, col, .. } = cell.clone();
-		commands.spawn((
-			LifeCellRef { row, col, tick: 1 },
-			Mesh3d(handles.mesh.clone()),
-			MeshMaterial3d(handles.material.clone()),
-			Transform::from_xyz(row as f32 * CUBE_SIZE, -1., col as f32 * CUBE_SIZE),
-			Visibility::Visible,
-		));
-	}
+	// for entity in conway.entities.iter() {
+	// 	commands.entity(*entity).remove::<TopLayer>();
+	// }
 
 	conway.tick();
 
-	// After tick, update the state of the top slice of blocks
-	let mut iter = q_cells.iter_many_mut(
-		conway
-			.grid
-			.iter()
-			.flat_map(|cells| cells)
-			.filter_map(|cell| cell.entity),
-	);
-	while let Some((cell_ref, _, mut visibility)) = iter.fetch_next() {
-		let cell = &conway.grid[cell_ref.row][cell_ref.col];
-
-		if cell.alive && visibility.as_ref() == Visibility::Hidden {
-			*visibility = Visibility::Visible;
-		} else if !cell.alive && visibility.as_ref() == Visibility::Visible {
-			*visibility = Visibility::Hidden;
+	for (index, cell) in conway.current.iter().enumerate() {
+		if !cell.alive {
+			continue;
 		}
-	}
 
-	// Shift all states downwards
-	for (mut cell, mut transform, _) in q_cells.iter_mut() {
-		if cell.tick >= 1 {
-			transform.translation.y -= 1.;
-			cell.tick += 1;
+		// println!("{index} {} {}", cell.row, cell.col);
+
+		let entity = commands
+			.spawn((
+				// TopLayer,
+				CellLocation {
+					row: cell.row,
+					col: cell.col,
+					tick: 1,
+				},
+				Mesh3d(handles.mesh.clone()),
+				MeshMaterial3d(handles.material.clone()),
+				Transform::from_xyz(
+					cell.row as f32 * Conway::CUBE_SIZE,
+					0.,
+					cell.col as f32 * Conway::CUBE_SIZE,
+				),
+			))
+			.id();
+	}
+}
+
+fn translate_cells(
+	mut commands: Commands,
+	mut q_cells: Query<(&mut Transform, Entity), (With<CellLocation>, Without<TopLayer>)>,
+	time: Res<Time>,
+) {
+	const SPEED: f32 = 5.;
+	const DESTROY_POS: f32 = 20.;
+
+	for (mut transform, entity) in q_cells.iter_mut() {
+		transform.translation.y += -SPEED * time.delta_secs();
+
+		if transform.translation.y.abs() > DESTROY_POS {
+			commands.entity(entity).despawn_recursive();
 		}
 	}
 }

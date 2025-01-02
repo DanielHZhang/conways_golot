@@ -1,75 +1,77 @@
 use bevy::prelude::*;
+use rand::prelude::*;
 
-#[derive(Resource)]
+use crate::Handles;
+
+#[derive(Resource, Debug)]
 pub struct Conway {
-	pub grid: Vec<Vec<LifeCell>>,
+	// pub entities: Vec<Entity>,
+	pub current: Vec<LifeCell>,
+	pub prev: Vec<LifeCell>,
+	size: usize,
 }
 
-#[derive(Component, Clone, Hash)]
-pub struct LifeCellRef {
+#[derive(Debug, Clone)]
+pub struct LifeCell {
 	pub row: usize,
 	pub col: usize,
-	pub tick: usize,
-}
-
-pub struct LifeCell {
-	pub entity: Option<Entity>,
 	pub alive: bool,
 }
 
 impl Conway {
-	pub fn new(size: u8) -> Self {
-		let mut grid = Vec::with_capacity(size as usize);
+	pub const CUBE_SIZE: f32 = 0.25;
 
-		for _ in 0..size {
-			let mut col = Vec::with_capacity(size as usize);
-			for _ in 0..size {
-				col.push(LifeCell {
-					entity: None,
-					alive: false, // if rng.gen_range(1..=6) > 3 { true } else { false },
-				})
-			}
-			grid.push(col);
+	pub fn new(size: usize) -> Self {
+		let capacity = size.saturating_mul(size);
+
+		Self {
+			// entities,
+			prev: Vec::with_capacity(capacity),
+			current: Vec::with_capacity(capacity),
+			size,
 		}
-
-		Self { grid }
 	}
 
 	pub fn tick(&mut self) {
 		const NEIGHBOURS: [(isize, isize); 8] = [(-1, 1), (-1, 0), (-1, -1), (0, 1), (0, -1), (1, 1), (1, 0), (1, -1)];
 
-		let rows = self.grid.len();
-		let Some(cols) = self.grid.get(0).map(|items| items.len()) else {
-			return;
-		};
+		std::mem::swap(&mut self.prev, &mut self.current); // Use prev to build new current
 
-		for row in 0..rows {
-			for col in 0..cols {
+		for row in 0..self.size {
+			for col in 0..self.size {
 				let mut alive_count = 0;
 
 				for (i, j) in &NEIGHBOURS {
-					let (x, y) = (row as isize + *i, col as isize + *j);
-					if x < 0 || y < 0 || x >= rows as isize || y >= cols as isize {
+					let x = row as isize + *i;
+					let y = col as isize + *j;
+
+					if x < 0 || y < 0 || x >= self.size as isize || y >= self.size as isize {
 						continue;
 					}
 
-					let cell = &self.grid[x as usize][y as usize];
+					let cell = &self.prev[x as usize * self.size + y as usize];
 					if cell.alive {
 						alive_count += 1;
 					}
 				}
 
-				let cell = &mut self.grid[row][col];
-				if cell.alive {
-					if alive_count < 2 || alive_count > 3 {
-						cell.alive = false;
-					}
-				} else {
-					if alive_count == 3 {
-						cell.alive = true;
-					}
-				}
+				let cell = &mut self.current[row * self.size + col];
+				cell.alive = match (cell.alive, alive_count) {
+					(true, 2..=3) => true,
+					(false, 3) => true,
+					_ => false,
+				};
 			}
 		}
 	}
 }
+
+#[derive(Component, Clone, Hash)]
+pub struct CellLocation {
+	pub row: usize,
+	pub col: usize,
+	pub tick: usize,
+}
+
+#[derive(Component)]
+pub struct TopLayer;
