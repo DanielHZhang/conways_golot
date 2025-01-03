@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
+use crate::CUBE_SIZE;
+
 #[derive(Resource, Debug)]
 pub struct Conway {
 	pub current: Vec<LifeCell>,
-	pub allow_tick: bool,
 	size: usize,
 	generation: usize,
+	pub allow_tick: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -67,9 +69,18 @@ impl Conway {
 	}
 }
 
-#[derive(Component, Clone, Hash)]
+#[derive(Component, Clone)]
 pub struct CellLocation {
 	pub row: usize,
 	pub col: usize,
 	pub gen: usize,
+	pub elapsed: f32,
+}
+
+impl CellLocation {
+	pub fn new_transform(&self, grid_size: usize) -> Transform {
+		let half_extent = -(grid_size as f32 * CUBE_SIZE / 2.);
+		let (row, col) = (self.row as f32 * CUBE_SIZE, self.col as f32 * CUBE_SIZE);
+		Transform::from_xyz(half_extent + row, 0., half_extent + col)
+	}
 }
