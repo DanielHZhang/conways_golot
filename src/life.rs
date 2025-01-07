@@ -1,17 +1,15 @@
-use std::time::Duration;
-
 use bevy::{prelude::*, time::Stopwatch};
 
 #[derive(Resource, Debug)]
 pub struct Conway {
-	pub current: Vec<LifeCell>,
+	pub current: Vec<CellData>,
 	generation: usize,
 	grid_size: usize,
 	cube_size: f32,
 }
 
 #[derive(Debug, Clone)]
-pub struct LifeCell {
+pub struct CellData {
 	pub row: usize,
 	pub col: usize,
 	pub alive: bool,
@@ -67,10 +65,6 @@ impl Conway {
 		self.generation += 1;
 	}
 
-	pub fn generation(&self) -> usize {
-		self.generation
-	}
-
 	pub fn grid_size(&self) -> usize {
 		self.grid_size
 	}
@@ -81,32 +75,20 @@ impl Conway {
 }
 
 #[derive(Component)]
-pub struct CellLocation {
-	pub row: usize,
-	pub col: usize,
-	pub generation: usize,
-	pub elapsed: Duration,
+pub struct LifeCell {
+	pub falling: bool,
+	pub elapsed: f32,
 }
 
-impl CellLocation {
-	pub fn new(row: usize, col: usize, elapsed: Duration, conway: &Conway) -> (Self, Transform) {
+impl LifeCell {
+	pub fn new_transform(row: usize, col: usize, conway: &Conway) -> Transform {
 		let &Conway {
-			grid_size,
-			cube_size,
-			generation,
-			..
+			grid_size, cube_size, ..
 		} = conway;
+
 		let half_extent = -(grid_size as f32 * cube_size / 2.);
 		let (x, z) = (row as f32 * cube_size, col as f32 * cube_size);
-		(
-			Self {
-				row,
-				col,
-				generation,
-				elapsed,
-			},
-			Transform::from_xyz(half_extent + x, 0., half_extent + z),
-		)
+		Transform::from_xyz(half_extent + x, 0., half_extent + z)
 	}
 }
 
