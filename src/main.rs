@@ -1,7 +1,7 @@
 mod camera;
 mod life;
 
-use bevy::{color::palettes, core_pipeline::tonemapping::DebandDither, prelude::*, time::Stopwatch};
+use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*, time::Stopwatch};
 use camera::{orbit, zoom, zoom_interpolate, CameraSettings, OrbitCamera};
 use life::{CellData, Conway, Destroy, LifeCell};
 use rand::prelude::*;
@@ -16,7 +16,7 @@ fn main() {
 		primary_window: Some(Window {
 			title: "Conway's Game of Life".to_string(),
 			resizable: false,
-			resolution: (1280., 720.).into(),
+			resolution: (1600., 900.).into(),
 			..default()
 		}),
 		..default()
@@ -54,6 +54,7 @@ fn setup(
 	mut materials: ResMut<Assets<StandardMaterial>>,
 	mut handles: ResMut<Handles>,
 	mut conway: ResMut<Conway>,
+	asset_server: Res<AssetServer>,
 ) {
 	// Camera
 	commands.spawn((
@@ -68,27 +69,18 @@ fn setup(
 	commands.spawn((
 		PointLight {
 			shadows_enabled: true,
-			intensity: 10_000_000.,
-			range: 100.0,
+			intensity: 20_000_000.,
+			range: 200.0,
 			shadow_depth_bias: 0.2,
 			..default()
 		},
-		Transform::from_xyz(0., 10.0, 0.),
-	));
-	commands.spawn((
-		PointLight {
-			shadows_enabled: true,
-			intensity: 1_000_000.,
-			range: 100.0,
-			shadow_depth_bias: 0.2,
-			..default()
-		},
-		Transform::from_xyz(20., 0., 20.),
+		Transform::from_xyz(10., 15., 20.),
 	));
 
+	let texture = asset_server.load("square.ktx2");
 	let alive_material = StandardMaterial {
-		base_color: palettes::tailwind::ZINC_200.into(),
-		..Default::default()
+		base_color_texture: Some(texture.clone()),
+		..default()
 	};
 	let material_handle = materials.add(alive_material);
 	handles.material = material_handle.clone();
