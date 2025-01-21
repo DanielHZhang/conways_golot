@@ -1,26 +1,51 @@
 mod camera;
 mod life;
 
-use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*, time::Stopwatch};
+use bevy::{
+	asset::AssetMetaCheck,
+	core_pipeline::tonemapping::{DebandDither, Tonemapping},
+	prelude::*,
+	time::Stopwatch,
+};
 use camera::{orbit, zoom, zoom_interpolate, CameraSettings, OrbitCamera};
 use life::{CellData, Conway, Destroy, LifeCell};
 use rand::prelude::*;
+use wasm_bindgen::prelude::*;
 
 const FIXED_TIMESTEP: f32 = 0.1;
 const SPEED: f32 = 5.;
 
 fn main() {
+	#[cfg(not(target_arch = "wasm32"))]
+	run_bevy_app(None);
+}
+
+/// asset_root_path specifies the URL root that the asset server should resolve all load paths relative to
+#[wasm_bindgen]
+pub fn run_bevy_app(asset_root_path: Option<String>) {
 	let mut app = App::new();
 
-	app.add_plugins(DefaultPlugins.set(WindowPlugin {
+	let window_plugin = WindowPlugin {
 		primary_window: Some(Window {
 			title: "Conway's Game of Life".to_string(),
-			resizable: false,
+			#[cfg(not(target_arch = "wasm32"))]
 			resolution: (1600., 900.).into(),
+			#[cfg(target_arch = "wasm32")]
+			canvas: Some("#canvas-conways-golot".into()),
 			..default()
 		}),
 		..default()
-	}));
+	};
+
+	let mut asset_plugin = AssetPlugin {
+		meta_check: AssetMetaCheck::Never,
+		..default()
+	};
+	if let Some(path) = asset_root_path {
+		asset_plugin.file_path = path;
+	}
+
+	app.add_plugins(DefaultPlugins.set(window_plugin).set(asset_plugin));
 
 	app.insert_resource(ClearColor(Color::srgb_u8(21, 20, 28)));
 	app.insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP as f64));
@@ -60,6 +85,7 @@ fn setup(
 	commands.spawn((
 		Camera3d::default(),
 		Camera { hdr: true, ..default() },
+		Tonemapping::AcesFitted,
 		DebandDither::Enabled,
 		CameraSettings::init_transform(),
 		OrbitCamera::default(),

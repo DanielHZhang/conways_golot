@@ -4,11 +4,28 @@
     {
       "type": "shell",
       "label": "Run",
-      "command": "MTL_HUD_ENABLED=1 cargo run",
+      "command": "MTL_HUD_ENABLED=1 cargo run --features dynamic_linking",
       "group": {
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "type": "shell",
+      "label": "Build WASM",
+      "command": "cargo build --profile release --features bevy/webgpu --target wasm32-unknown-unknown",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "Run wasm_bindgen",
+      "command": "wasm-bindgen --out-dir wasm --out-name main --target web target/wasm32-unknown-unknown/release/conways_golot.wasm",
+      "group": {
+        "kind": "build"
+      },
+      "dependsOn": ["Build WASM"]
     }
   ]
 }
