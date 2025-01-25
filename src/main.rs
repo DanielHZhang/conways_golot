@@ -47,24 +47,58 @@ pub fn run_bevy_app(asset_root_path: Option<String>) {
 
 	app.add_plugins(DefaultPlugins.set(window_plugin).set(asset_plugin));
 
+	app.init_state::<SimulationState>();
+
 	app.insert_resource(ClearColor(Color::srgb_u8(21, 20, 28)));
 	app.insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP as f64));
 	app.init_resource::<CameraSettings>();
 	app.init_resource::<Handles>();
 	app.init_resource::<Conway>();
+	app.init_resource::<WaitTimer>();
 
 	app.add_systems(Startup, setup);
-	app.add_systems(FixedUpdate, tick_simulation);
+	app.add_systems(FixedUpdate, tick_simulation.run_if(in_state(SimulationState::Running)));
 	app.add_systems(
 		Update,
 		(
 			orbit,
 			(zoom, zoom_interpolate).chain(),
-			(translate_cells, tick_destroy).chain(),
+			wait_after_starting.run_if(in_state(SimulationState::Waiting)),
+			(translate_cells, tick_destroy)
+				.chain()
+				.run_if(in_state(SimulationState::Running)),
 		),
 	);
 
 	app.run();
+}
+
+#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Default)]
+enum SimulationState {
+	#[default]
+	Waiting,
+	Running,
+}
+
+#[derive(Resource, Deref, DerefMut)]
+struct WaitTimer(Timer);
+
+impl Default for WaitTimer {
+	fn default() -> Self {
+		Self(Timer::from_seconds(0.5, TimerMode::Once))
+	}
+}
+
+fn wait_after_starting(
+	mut next_state: ResMut<NextState<SimulationState>>,
+	mut wait_timer: ResMut<WaitTimer>,
+	time: Res<Time>,
+) {
+	wait_timer.tick(time.delta());
+
+	if wait_timer.finished() {
+		next_state.set(SimulationState::Running);
+	}
 }
 
 #[derive(Resource, Default)]
