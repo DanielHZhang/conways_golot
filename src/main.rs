@@ -17,19 +17,18 @@ const SPEED: f32 = 5.;
 
 fn main() {
 	#[cfg(not(target_arch = "wasm32"))]
-	run_bevy_app(None);
+	run_bevy_app(None, 1600., 900.);
 }
 
 /// asset_root_path specifies the URL root that the asset server should resolve all load paths relative to
 #[wasm_bindgen]
-pub fn run_bevy_app(asset_root_path: Option<String>) {
+pub fn run_bevy_app(asset_root_path: Option<String>, width: f32, height: f32) {
 	let mut app = App::new();
 
 	let window_plugin = WindowPlugin {
 		primary_window: Some(Window {
 			title: "Conway's Game of Life".to_string(),
-			#[cfg(not(target_arch = "wasm32"))]
-			resolution: (1600., 900.).into(),
+			resolution: (width, height).into(),
 			#[cfg(target_arch = "wasm32")]
 			canvas: Some("#canvas-conways-golot".into()),
 			..default()
@@ -118,7 +117,10 @@ fn setup(
 	// Camera
 	commands.spawn((
 		Camera3d::default(),
-		Camera { hdr: true, ..default() },
+		Camera {
+			hdr: cfg!(not(target_arch = "wasm32")),
+			..default()
+		},
 		Tonemapping::AcesFitted,
 		DebandDither::Enabled,
 		CameraSettings::init_transform(),
